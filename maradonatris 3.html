@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>MARADONATRIS</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@400;700&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: #0a1628;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 100vh;
+  padding: 12px 8px;
+  font-family: 'Oswald', sans-serif;
+  overflow-x: hidden;
+}
+.title-bar { text-align: center; margin-bottom: 8px; }
+.title-bar h1 { font-family: 'Bebas Neue', cursive; font-size: 32px; color: #FFD700; letter-spacing: 4px; text-shadow: 0 0 20px rgba(255,215,0,0.5); line-height: 1; }
+.title-bar p { font-size: 10px; color: #75b2dd; letter-spacing: 2px; }
+.stats-row { display: flex; gap: 10px; margin-bottom: 8px; width: 100%; max-width: 320px; justify-content: center; }
+.stat-box { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,215,0,0.2); border-radius: 8px; padding: 6px 12px; text-align: center; flex: 1; }
+.stat-label { font-size: 9px; color: #75b2dd; letter-spacing: 1px; text-transform: uppercase; }
+.stat-value { font-family: 'Bebas Neue', cursive; font-size: 22px; color: #FFD700; line-height: 1; }
+.game-row { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 10px; }
+#gameCanvas { border: 2px solid rgba(255,215,0,0.4); border-radius: 4px; image-rendering: pixelated; display: block; }
+.side-panel { display: flex; flex-direction: column; gap: 8px; width: 80px; }
+.panel-box { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,215,0,0.2); border-radius: 8px; padding: 8px; text-align: center; }
+.panel-label { font-size: 9px; color: #75b2dd; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 4px; }
+#nextCanvas { image-rendering: pixelated; }
+.quote-box { font-size: 9px; color: #aaa; font-style: italic; line-height: 1.4; border-left: 2px solid #FFD700; background: rgba(255,255,255,0.03); border-radius: 0 6px 6px 0; padding: 6px 6px 6px 8px; }
+.btn { background: rgba(255,215,0,0.1); border: 1px solid rgba(255,215,0,0.4); color: #FFD700; font-family: 'Oswald', sans-serif; font-size: 11px; letter-spacing: 1px; padding: 6px 8px; border-radius: 4px; cursor: pointer; text-transform: uppercase; width: 100%; }
+.btn:active { background: rgba(255,215,0,0.3); }
+.controls { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 100%; max-width: 320px; }
+.ctrl-row { display: flex; gap: 6px; justify-content: center; }
+.ctrl-btn { width: 70px; height: 58px; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,215,0,0.35); border-radius: 12px; color: #FFD700; font-size: 26px; display: flex; align-items: center; justify-content: center; cursor: pointer; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
+.ctrl-btn:active { background: rgba(255,215,0,0.25); transform: scale(0.95); }
+.ctrl-btn.drop { width: 148px; font-size: 13px; font-family: 'Oswald', sans-serif; letter-spacing: 2px; height: 48px; }
+#overlay { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(10,22,40,0.92); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10; gap: 10px; text-align: center; border-radius: 4px; }
+#overlay h2 { font-family: 'Bebas Neue', cursive; font-size: 36px; color: #FFD700; letter-spacing: 3px; }
+#overlay p { color: #75b2dd; font-size: 12px; letter-spacing: 1px; }
+.overlay-btn { background: rgba(255,215,0,0.2); border: 1px solid #FFD700; color: #FFD700; font-family: 'Oswald', sans-serif; font-size: 16px; letter-spacing: 2px; padding: 10px 24px; border-radius: 6px; cursor: pointer; margin-top: 8px; }
+</style>
+</head>
+<body>
+
+<div class="title-bar">
+  <h1>MARADONATRIS</h1>
+  <p>El Pibe de Oro · 1960 – 2020</p>
+</div>
+
+<div class="stats-row">
+  <div class="stat-box"><div class="stat-label">Puntos</div><div class="stat-value" id="scoreVal">0</div></div>
+  <div class="stat-box"><div class="stat-label">Nivel</div><div class="stat-value" id="levelVal">1</div></div>
+  <div class="stat-box"><div class="stat-label">Líneas</div><div class="stat-value" id="linesVal">0</div></div>
+</div>
+
+<div class="game-row">
+  <div style="position:relative;">
+    <canvas id="gameCanvas" width="200" height="380"></canvas>
+    <div id="overlay">
+      <h2>MARADONATRIS</h2>
+      <p>Dedicado al Diego ⚽</p>
+      <button class="overlay-btn" id="startBtn">¡A Jugar!</button>
+    </div>
+  </div>
+  <div class="side-panel">
+    <div class="panel-box">
+      <div class="panel-label">Siguiente</div>
+      <canvas id="nextCanvas" width="72" height="72"></canvas>
+    </div>
+    <div class="quote-box" id="quoteBox">"La pelota no se mancha"</div>
+    <button class="btn" id="pauseBtn">Pausa</button>
+    <button class="btn" id="restartBtn">Reiniciar</button>
+  </div>
+</div>
+
+<div class="controls">
+  <div class="ctrl-row">
+    <div class="ctrl-btn" id="btnRotate">↻</div>
+  </div>
+  <div class="ctrl-row">
+    <div class="ctrl-btn" id="btnLeft">◀</div>
+    <div class="ctrl-btn" id="btnDown">▼</div>
+    <div class="ctrl-btn" id="btnRight">▶</div>
+  </div>
+  <div class="ctrl-row">
+    <div class="ctrl-btn drop" id="btnDrop">⬇ SOLTAR</div>
+  </div>
+</div>
+
+<script>
+const COLS=10,ROWS=19,BLOCK=20;
+const COLORS=[null,'#3498DB','#FFD700','#E74C3C','#2ECC71','#9B59B6','#E67E22','#1ABC9C'];
+const SHAPES={
+  I:[[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]],
+  O:[[2,2],[2,2]],
+  T:[[0,3,0],[3,3,3],[0,0,0]],
+  S:[[0,4,4],[4,4,0],[0,0,0]],
+  Z:[[5,5,0],[0,5,5],[0,0,0]],
+  J:[[6,0,0],[6,6,6],[0,0,0]],
+  L:[[0,0,7],[7,7,7],[0,0,0]]
+};
+const QUOTES=['"¡Soy yo, Diego!"','"La pelota no se mancha"','"Nací para jugar al fútbol"','"Dios te da talento..."','"El fútbol es el deporte más lindo"'];
+const canvas=document.getElementById('gameCanvas');
+const ctx=canvas.getContext('2d');
+const nextCanvas=document.getElementById('nextCanvas');
+const nCtx=nextCanvas.getContext('2d');
+let board,piece,nextPiece,score,level,lines,gameLoop,paused,started,gameOver;
+
+function createBoard(){return Array.from({length:ROWS},()=>Array(COLS).fill(0));}
+function randomPiece(){const keys=Object.keys(SHAPES);const key=keys[Math.floor(Math.random()*keys.length)];const shape=SHAPES[key];return{shape:shape.map(r=>[...r]),x:Math.floor(COLS/2)-Math.floor(shape[0].length/2),y:0};}
+function drawBlock(context,x,y,colorIndex,size){if(!colorIndex)return;const s=size||BLOCK;context.fillStyle=COLORS[colorIndex];context.fillRect(x*s+1,y*s+1,s-2,s-2);context.strokeStyle='rgba(255,255,255,0.25)';context.lineWidth=0.5;context.strokeRect(x*s+1,y*s+1,s-2,s-2);context.fillStyle='rgba(255,255,255,0.2)';context.fillRect(x*s+2,y*s+2,s-4,3);}
+function drawBoard(){ctx.fillStyle='#0a1628';ctx.fillRect(0,0,canvas.width,canvas.height);for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){if(board[r][c])drawBlock(ctx,c,r,board[r][c]);else{ctx.fillStyle='rgba(255,255,255,0.02)';ctx.fillRect(c*BLOCK,r*BLOCK,BLOCK,BLOCK);}}}
+function drawPiece(p){p.shape.forEach((row,r)=>row.forEach((val,c)=>{if(val)drawBlock(ctx,p.x+c,p.y+r,val);}));}
+function drawGhost(){let ghost={shape:piece.shape,x:piece.x,y:piece.y};while(!collides(ghost.shape,ghost.x,ghost.y+1))ghost.y++;ghost.shape.forEach((row,r)=>row.forEach((val,c)=>{if(val){ctx.strokeStyle='rgba(255,215,0,0.2)';ctx.lineWidth=1;ctx.strokeRect((ghost.x+c)*BLOCK+1,(ghost.y+r)*BLOCK+1,BLOCK-2,BLOCK-2);}}));}
+function drawNext(){nCtx.clearRect(0,0,72,72);const s=nextPiece.shape,bSize=14;const ox=Math.floor((4-s[0].length)/2),oy=Math.floor((4-s.length)/2);s.forEach((row,r)=>row.forEach((val,c)=>{if(val){nCtx.fillStyle=COLORS[val];nCtx.fillRect((ox+c)*bSize+8,(oy+r)*bSize+8,bSize-2,bSize-2);nCtx.fillStyle='rgba(255,255,255,0.2)';nCtx.fillRect((ox+c)*bSize+8,(oy+r)*bSize+8,bSize-2,3);}}));}
+function collides(shape,px,py){for(let r=0;r<shape.length;r++)for(let c=0;c<shape[r].length;c++){if(!shape[r][c])continue;const nx=px+c,ny=py+r;if(nx<0||nx>=COLS||ny>=ROWS)return true;if(ny>=0&&board[ny][nx])return true;}return false;}
+function merge(){piece.shape.forEach((row,r)=>row.forEach((val,c)=>{if(val)board[piece.y+r][piece.x+c]=val;}));}
+function clearLines(){let cleared=0;for(let r=ROWS-1;r>=0;r--){if(board[r].every(v=>v)){board.splice(r,1);board.unshift(Array(COLS).fill(0));cleared++;r++;}}if(cleared){const pts=[0,100,300,500,800];score+=(pts[cleared]||800)*level;lines+=cleared;level=Math.floor(lines/10)+1;document.getElementById('scoreVal').textContent=score;document.getElementById('levelVal').textContent=level;document.getElementById('linesVal').textContent=lines;if(Math.random()<0.4)document.getElementById('quoteBox').textContent=QUOTES[Math.floor(Math.random()*QUOTES.length)];clearInterval(gameLoop);gameLoop=setInterval(drop,Math.max(100,800-(level-1)*80));}}
+function rotate(shape){const n=shape.length,m=shape[0].length;const result=Array.from({length:m},()=>Array(n).fill(0));for(let r=0;r<n;r++)for(let c=0;c<m;c++)result[c][n-1-r]=shape[r][c];return result;}
+function drop(){if(!started||paused||gameOver)return;if(!collides(piece.shape,piece.x,piece.y+1)){piece.y++;}else{merge();clearLines();piece=nextPiece;nextPiece=randomPiece();drawNext();if(collides(piece.shape,piece.x,piece.y)){endGame();return;}}render();}
+function render(){drawBoard();drawGhost();drawPiece(piece);}
+function startGame(){board=createBoard();score=0;level=1;lines=0;piece=randomPiece();nextPiece=randomPiece();paused=false;gameOver=false;started=true;document.getElementById('scoreVal').textContent=0;document.getElementById('levelVal').textContent=1;document.getElementById('linesVal').textContent=0;document.getElementById('overlay').style.display='none';document.getElementById('pauseBtn').textContent='Pausa';drawNext();if(gameLoop)clearInterval(gameLoop);gameLoop=setInterval(drop,800);render();}
+function endGame(){started=false;gameOver=true;clearInterval(gameLoop);const ov=document.getElementById('overlay');ov.innerHTML=`<h2>FIN DEL PARTIDO</h2><p style="font-family:'Bebas Neue',cursive;font-size:30px;color:#FFD700;">PUNTOS: ${score}</p><p style="color:#75b2dd;font-size:12px;">NIVEL ${level} · ${lines} LÍNEAS</p><p style="color:#FFD700;font-size:12px;margin-top:4px;">"La pelota no se mancha"</p><button class="overlay-btn" onclick="startGame()" style="margin-top:8px;">Jugar de Nuevo</button>`;ov.style.display='flex';}
+
+function pressLeft(){if(!started||paused||gameOver)return;if(!collides(piece.shape,piece.x-1,piece.y)){piece.x--;render();}}
+function pressRight(){if(!started||paused||gameOver)return;if(!collides(piece.shape,piece.x+1,piece.y)){piece.x++;render();}}
+function pressDown(){if(!started||paused||gameOver)return;drop();}
+function pressRotate(){if(!started||paused||gameOver)return;const rot=rotate(piece.shape);if(!collides(rot,piece.x,piece.y)){piece.shape=rot;render();}else if(!collides(rot,piece.x+1,piece.y)){piece.x++;piece.shape=rot;render();}else if(!collides(rot,piece.x-1,piece.y)){piece.x--;piece.shape=rot;render();}}
+function pressDrop(){if(!started||paused||gameOver)return;while(!collides(piece.shape,piece.x,piece.y+1))piece.y++;drop();}
+
+// Touch buttons con repetición al mantener pulsado
+function addCtrlBtn(id, fn, repeat){
+  const el=document.getElementById(id);
+  let interval;
+  el.addEventListener('touchstart',e=>{e.preventDefault();fn();if(repeat)interval=setInterval(fn,130);},{passive:false});
+  el.addEventListener('touchend',e=>{e.preventDefault();clearInterval(interval);},{passive:false});
+  el.addEventListener('mousedown',e=>{fn();if(repeat)interval=setInterval(fn,130);});
+  el.addEventListener('mouseup',()=>clearInterval(interval));
+}
+addCtrlBtn('btnLeft', pressLeft, true);
+addCtrlBtn('btnRight', pressRight, true);
+addCtrlBtn('btnDown', pressDown, true);
+addCtrlBtn('btnRotate', pressRotate, false);
+addCtrlBtn('btnDrop', pressDrop, false);
+
+document.getElementById('startBtn').addEventListener('click',startGame);
+document.getElementById('restartBtn').addEventListener('click',startGame);
+document.getElementById('pauseBtn').addEventListener('click',()=>{if(!started||gameOver)return;paused=!paused;document.getElementById('pauseBtn').textContent=paused?'Continuar':'Pausa';if(!paused)render();});
+document.addEventListener('keydown',e=>{if(!started||paused||gameOver)return;if(e.key==='ArrowLeft')pressLeft();else if(e.key==='ArrowRight')pressRight();else if(e.key==='ArrowDown')pressDown();else if(e.key==='ArrowUp')pressRotate();else if(e.key===' '){e.preventDefault();pressDrop();}});
+
+drawBoard();
+</script>
+</body>
+</html>
