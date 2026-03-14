@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>MARADONATRIS</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@400;700&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: #0a1628;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  min-height: 100vh;
+  padding: 16px 8px;
+  font-family: 'Oswald', sans-serif;
+  overflow-x: hidden;
+}
+body::before {
+  content: '';
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: repeating-linear-gradient(0deg,transparent,transparent 39px,rgba(255,255,255,0.03) 39px,rgba(255,255,255,0.03) 40px),
+              repeating-linear-gradient(90deg,transparent,transparent 39px,rgba(255,255,255,0.03) 39px,rgba(255,255,255,0.03) 40px);
+  pointer-events: none;
+}
+.title-bar { text-align: center; margin-bottom: 12px; position: relative; z-index: 1; }
+.title-bar h1 { font-family: 'Bebas Neue', cursive; font-size: 36px; color: #FFD700; letter-spacing: 4px; text-shadow: 0 0 20px rgba(255,215,0,0.5); line-height: 1; }
+.title-bar p { font-size: 11px; color: #75b2dd; letter-spacing: 2px; text-transform: uppercase; }
+.game-layout { display: flex; gap: 16px; align-items: flex-start; position: relative; z-index: 1; }
+.left-panel, .right-panel { display: flex; flex-direction: column; gap: 12px; width: 90px; }
+.panel-box { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,215,0,0.2); border-radius: 8px; padding: 10px; text-align: center; }
+.panel-label { font-size: 10px; color: #75b2dd; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 4px; }
+.panel-value { font-family: 'Bebas Neue', cursive; font-size: 28px; color: #FFD700; line-height: 1; }
+.next-canvas-wrap { display: flex; justify-content: center; align-items: center; height: 80px; }
+#nextCanvas { image-rendering: pixelated; }
+#gameCanvas { border: 2px solid rgba(255,215,0,0.4); border-radius: 4px; image-rendering: pixelated; display: block; }
+.quote-box { font-size: 10px; color: #aaa; font-style: italic; line-height: 1.4; border-left: 2px solid #FFD700; padding-left: 8px; text-align: left; }
+.btn-wrap { display: flex; flex-direction: column; gap: 6px; }
+.btn { background: transparent; border: 1px solid rgba(255,215,0,0.4); color: #FFD700; font-family: 'Oswald', sans-serif; font-size: 12px; letter-spacing: 1px; padding: 6px 10px; border-radius: 4px; cursor: pointer; text-transform: uppercase; }
+.btn:hover { background: rgba(255,215,0,0.15); border-color: #FFD700; }
+.btn-start { background: rgba(255,215,0,0.2); border-color: #FFD700; font-size: 14px; padding: 8px 12px; }
+.controls-hint { font-size: 9px; color: #555; text-align: center; line-height: 1.6; text-transform: uppercase; letter-spacing: 1px; }
+#overlay { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(10,22,40,0.88); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10; gap: 12px; text-align: center; }
+#overlay h2 { font-family: 'Bebas Neue', cursive; font-size: 40px; color: #FFD700; letter-spacing: 4px; text-shadow: 0 0 30px rgba(255,215,0,0.6); }
+#overlay p { color: #75b2dd; font-size: 13px; letter-spacing: 1px; }
+</style>
+</head>
+<body>
+<div class="title-bar">
+  <h1>MARADONATRIS</h1>
+  <p>El Pibe de Oro · 1960 – 2020</p>
+</div>
+<div class="game-layout">
+  <div class="left-panel">
+    <div class="panel-box"><div class="panel-label">Puntos</div><div class="panel-value" id="scoreVal">0</div></div>
+    <div class="panel-box"><div class="panel-label">Nivel</div><div class="panel-value" id="levelVal">1</div></div>
+    <div class="panel-box"><div class="panel-label">Líneas</div><div class="panel-value" id="linesVal">0</div></div>
+    <div class="panel-box quote-box" id="quoteBox">"El fútbol es el deporte más lindo del mundo"</div>
+  </div>
+  <div style="position:relative;">
+    <canvas id="gameCanvas" width="200" height="400"></canvas>
+    <div id="overlay">
+      <h2>MARADONATRIS</h2>
+      <p>Dedicado al Diego</p>
+      <p style="font-size:10px;color:#666;padding:0 16px;">Swipe ← → mover · Swipe ↑ rotar · Swipe ↓ soltar</p>
+      <button class="btn btn-start" id="startBtn">¡A Jugar!</button>
+    </div>
+  </div>
+  <div class="right-panel">
+    <div class="panel-box">
+      <div class="panel-label">Siguiente</div>
+      <div class="next-canvas-wrap"><canvas id="nextCanvas" width="80" height="80"></canvas></div>
+    </div>
+    <div class="btn-wrap">
+      <button class="btn btn-start" id="pauseBtn">Pausa</button>
+      <button class="btn" id="restartBtn">Reiniciar</button>
+    </div>
+    <div class="controls-hint">← → Mover<br>↑ Rotar<br>↓ Bajar<br>Espacio Soltar</div>
+    <div class="panel-box" style="margin-top:4px;">
+      <div style="font-size:28px;">⚽</div>
+      <div style="font-size:9px;color:#FFD700;letter-spacing:1px;margin-top:4px;">LA MANO DE DIOS</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const COLS=10,ROWS=20,BLOCK=20;
+const COLORS=[null,'#3498DB','#FFD700','#E74C3C','#2ECC71','#9B59B6','#E67E22','#1ABC9C'];
+const SHAPES={
+  I:[[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]],
+  O:[[2,2],[2,2]],
+  T:[[0,3,0],[3,3,3],[0,0,0]],
+  S:[[0,4,4],[4,4,0],[0,0,0]],
+  Z:[[5,5,0],[0,5,5],[0,0,0]],
+  J:[[6,0,0],[6,6,6],[0,0,0]],
+  L:[[0,0,7],[7,7,7],[0,0,0]]
+};
+const QUOTES=[
+  '"¡Soy yo, Diego!"',
+  '"El fútbol es el\ndeporte más lindo\ndel mundo"',
+  '"La pelota no\nse mancha"',
+  '"Nací para jugar\nal fútbol"',
+  '"Dios te da talento..."',
+];
+const canvas=document.getElementById('gameCanvas');
+const ctx=canvas.getContext('2d');
+const nextCanvas=document.getElementById('nextCanvas');
+const nCtx=nextCanvas.getContext('2d');
+let board,piece,nextPiece,score,level,lines,gameLoop,paused,started,gameOver;
+
+function createBoard(){return Array.from({length:ROWS},()=>Array(COLS).fill(0));}
+function randomPiece(){
+  const keys=Object.keys(SHAPES);
+  const key=keys[Math.floor(Math.random()*keys.length)];
+  const shape=SHAPES[key];
+  return{shape:shape.map(r=>[...r]),x:Math.floor(COLS/2)-Math.floor(shape[0].length/2),y:0};
+}
+function drawBlock(context,x,y,colorIndex,size){
+  if(!colorIndex)return;
+  const s=size||BLOCK;
+  context.fillStyle=COLORS[colorIndex];
+  context.fillRect(x*s+1,y*s+1,s-2,s-2);
+  context.strokeStyle='rgba(255,255,255,0.3)';
+  context.lineWidth=0.5;
+  context.strokeRect(x*s+1,y*s+1,s-2,s-2);
+  context.fillStyle='rgba(255,255,255,0.25)';
+  context.fillRect(x*s+2,y*s+2,s-4,3);
+}
+function drawBoard(){
+  ctx.fillStyle='#0a1628';
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
+    if(board[r][c])drawBlock(ctx,c,r,board[r][c]);
+    else{ctx.fillStyle='rgba(255,255,255,0.02)';ctx.fillRect(c*BLOCK,r*BLOCK,BLOCK,BLOCK);}
+  }
+}
+function drawPiece(p){
+  p.shape.forEach((row,r)=>row.forEach((val,c)=>{if(val)drawBlock(ctx,p.x+c,p.y+r,val);}));
+}
+function drawGhost(){
+  let ghost={shape:piece.shape,x:piece.x,y:piece.y};
+  while(!collides(ghost.shape,ghost.x,ghost.y+1))ghost.y++;
+  ghost.shape.forEach((row,r)=>row.forEach((val,c)=>{
+    if(val){ctx.strokeStyle='rgba(255,215,0,0.25)';ctx.lineWidth=1;ctx.strokeRect((ghost.x+c)*BLOCK+1,(ghost.y+r)*BLOCK+1,BLOCK-2,BLOCK-2);}
+  }));
+}
+function drawNext(){
+  nCtx.clearRect(0,0,80,80);
+  const s=nextPiece.shape,bSize=16;
+  const ox=Math.floor((4-s[0].length)/2),oy=Math.floor((4-s.length)/2);
+  s.forEach((row,r)=>row.forEach((val,c)=>{
+    if(val){
+      nCtx.fillStyle=COLORS[val];
+      nCtx.fillRect((ox+c)*bSize+8,(oy+r)*bSize+8,bSize-2,bSize-2);
+      nCtx.fillStyle='rgba(255,255,255,0.2)';
+      nCtx.fillRect((ox+c)*bSize+8,(oy+r)*bSize+8,bSize-2,3);
+    }
+  }));
+}
+function collides(shape,px,py){
+  for(let r=0;r<shape.length;r++)for(let c=0;c<shape[r].length;c++){
+    if(!shape[r][c])continue;
+    const nx=px+c,ny=py+r;
+    if(nx<0||nx>=COLS||ny>=ROWS)return true;
+    if(ny>=0&&board[ny][nx])return true;
+  }
+  return false;
+}
+function merge(){piece.shape.forEach((row,r)=>row.forEach((val,c)=>{if(val)board[piece.y+r][piece.x+c]=val;}));}
+function clearLines(){
+  let cleared=0;
+  for(let r=ROWS-1;r>=0;r--){
+    if(board[r].every(v=>v)){board.splice(r,1);board.unshift(Array(COLS).fill(0));cleared++;r++;}
+  }
+  if(cleared){
+    const pts=[0,100,300,500,800];
+    score+=(pts[cleared]||800)*level;lines+=cleared;level=Math.floor(lines/10)+1;
+    document.getElementById('scoreVal').textContent=score;
+    document.getElementById('levelVal').textContent=level;
+    document.getElementById('linesVal').textContent=lines;
+    if(Math.random()<0.4)document.getElementById('quoteBox').textContent=QUOTES[Math.floor(Math.random()*QUOTES.length)];
+    clearInterval(gameLoop);
+    gameLoop=setInterval(drop,Math.max(100,800-(level-1)*80));
+  }
+}
+function rotate(shape){
+  const n=shape.length,m=shape[0].length;
+  const result=Array.from({length:m},()=>Array(n).fill(0));
+  for(let r=0;r<n;r++)for(let c=0;c<m;c++)result[c][n-1-r]=shape[r][c];
+  return result;
+}
+function drop(){
+  if(!started||paused||gameOver)return;
+  if(!collides(piece.shape,piece.x,piece.y+1)){piece.y++;}
+  else{
+    merge();clearLines();
+    piece=nextPiece;nextPiece=randomPiece();drawNext();
+    if(collides(piece.shape,piece.x,piece.y)){endGame();return;}
+  }
+  render();
+}
+function render(){drawBoard();drawGhost();drawPiece(piece);}
+function startGame(){
+  board=createBoard();score=0;level=1;lines=0;
+  piece=randomPiece();nextPiece=randomPiece();
+  paused=false;gameOver=false;started=true;
+  document.getElementById('scoreVal').textContent=0;
+  document.getElementById('levelVal').textContent=1;
+  document.getElementById('linesVal').textContent=0;
+  document.getElementById('overlay').style.display='none';
+  drawNext();
+  if(gameLoop)clearInterval(gameLoop);
+  gameLoop=setInterval(drop,800);
+  render();
+}
+function endGame(){
+  started=false;gameOver=true;clearInterval(gameLoop);
+  const ov=document.getElementById('overlay');
+  ov.innerHTML=`<h2>FIN DEL PARTIDO</h2>
+    <p style="font-family:'Bebas Neue',cursive;font-size:32px;color:#FFD700;">PUNTOS: ${score}</p>
+    <p style="color:#75b2dd;font-size:12px;">NIVEL ${level} · ${lines} LÍNEAS</p>
+    <p style="color:#FFD700;font-size:13px;margin-top:8px;">"La pelota no se mancha"</p>
+    <button class="btn btn-start" onclick="startGame()" style="margin-top:12px;">Jugar de Nuevo</button>`;
+  ov.style.display='flex';
+}
+document.getElementById('startBtn').addEventListener('click',startGame);
+document.getElementById('restartBtn').addEventListener('click',startGame);
+document.getElementById('pauseBtn').addEventListener('click',()=>{
+  if(!started||gameOver)return;
+  paused=!paused;
+  document.getElementById('pauseBtn').textContent=paused?'Continuar':'Pausa';
+  if(!paused)render();
+});
+document.addEventListener('keydown',e=>{
+  if(!started||paused||gameOver)return;
+  if(e.key==='ArrowLeft'){if(!collides(piece.shape,piece.x-1,piece.y)){piece.x--;render();}}
+  else if(e.key==='ArrowRight'){if(!collides(piece.shape,piece.x+1,piece.y)){piece.x++;render();}}
+  else if(e.key==='ArrowDown'){drop();}
+  else if(e.key==='ArrowUp'){
+    const rot=rotate(piece.shape);
+    if(!collides(rot,piece.x,piece.y)){piece.shape=rot;render();}
+    else if(!collides(rot,piece.x+1,piece.y)){piece.x++;piece.shape=rot;render();}
+    else if(!collides(rot,piece.x-1,piece.y)){piece.x--;piece.shape=rot;render();}
+  }else if(e.key===' '){e.preventDefault();while(!collides(piece.shape,piece.x,piece.y+1))piece.y++;drop();}
+});
+let touchStartX=0,touchStartY=0;
+canvas.addEventListener('touchstart',e=>{touchStartX=e.touches[0].clientX;touchStartY=e.touches[0].clientY;e.preventDefault();},{passive:false});
+canvas.addEventListener('touchend',e=>{
+  if(!started||paused||gameOver)return;
+  const dx=e.changedTouches[0].clientX-touchStartX;
+  const dy=e.changedTouches[0].clientY-touchStartY;
+  if(Math.abs(dx)>Math.abs(dy)){
+    if(dx>20){if(!collides(piece.shape,piece.x+1,piece.y)){piece.x++;render();}}
+    else if(dx<-20){if(!collides(piece.shape,piece.x-1,piece.y)){piece.x--;render();}}
+  }else{
+    if(dy>30){while(!collides(piece.shape,piece.x,piece.y+1))piece.y++;drop();}
+    else if(dy<-20){const rot=rotate(piece.shape);if(!collides(rot,piece.x,piece.y)){piece.shape=rot;render();}}
+  }
+  e.preventDefault();
+},{passive:false});
+drawBoard();
+</script>
+</body>
+</html>
