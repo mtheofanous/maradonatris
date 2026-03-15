@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>EL PIBE TRIS — EN VIVO</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@400;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:#050d1a;display:flex;flex-direction:column;align-items:center;min-height:100vh;padding:8px 6px 14px;font-family:'Oswald',sans-serif;overflow-x:hidden;}
+
+#broadcastBar{width:100%;max-width:320px;background:#0d0005;border:1px solid rgba(220,30,30,0.35);border-radius:10px 10px 0 0;padding:5px 10px;display:flex;align-items:center;gap:8px;border-bottom:none;}
+.live-badge{background:#CC0000;color:white;font-size:9px;font-weight:700;letter-spacing:2px;padding:2px 7px;border-radius:3px;animation:livePulse 1.2s infinite;flex-shrink:0;}
+@keyframes livePulse{0%,100%{opacity:1;box-shadow:0 0 6px rgba(200,0,0,0.7);}50%{opacity:0.75;box-shadow:none;}}
+#channelName{font-size:10px;color:#FFD700;letter-spacing:2px;text-transform:uppercase;flex:1;}
+#clockDisplay{font-family:'Share Tech Mono',monospace;font-size:10px;color:#888;}
+
+#waveWrap{width:100%;max-width:320px;background:#080808;border-left:1px solid rgba(220,30,30,0.35);border-right:1px solid rgba(220,30,30,0.35);padding:3px 10px;display:flex;align-items:center;gap:8px;height:26px;}
+.mic-icon{font-size:13px;flex-shrink:0;}
+#waveCanvas{flex:1;height:18px;}
+#speakerName{font-size:9px;color:#555;letter-spacing:1px;white-space:nowrap;}
+
+#commentBox{width:100%;max-width:320px;background:#060606;border:1px solid rgba(220,30,30,0.35);border-top:none;border-radius:0 0 10px 10px;padding:8px 12px 10px;min-height:56px;margin-bottom:6px;position:relative;}
+#commentText{font-size:12px;color:#FFD700;font-style:italic;line-height:1.5;font-family:'Oswald',sans-serif;font-weight:400;}
+#commentText.muted{color:#333;font-style:normal;font-size:11px;}
+.cursor{display:inline-block;width:2px;height:12px;background:#FFD700;margin-left:1px;animation:cur 0.65s infinite;vertical-align:middle;}
+@keyframes cur{0%,100%{opacity:1}50%{opacity:0}}
+
+#ticker{width:100%;max-width:320px;background:#AA0000;height:18px;overflow:hidden;margin-bottom:6px;border-radius:3px;display:flex;align-items:center;}
+#tickerTrack{display:inline-block;white-space:nowrap;animation:tick 30s linear infinite;font-size:9px;color:white;letter-spacing:1px;font-weight:700;padding-left:320px;}
+@keyframes tick{0%{transform:translateX(0)}100%{transform:translateX(-100%)}}
+
+#voiceRow{width:100%;max-width:320px;display:flex;align-items:center;gap:6px;margin-bottom:4px;padding:0 2px;}
+.vdot{width:7px;height:7px;border-radius:50%;background:#222;flex-shrink:0;}
+.vdot.on{background:#2ECC71;animation:livePulse 1.2s infinite;}
+.vlabel{font-size:9px;color:#444;letter-spacing:1px;text-transform:uppercase;}
+.vlabel.on{color:#2ECC71;}
+.vlink{font-size:9px;color:#FFD700;text-decoration:underline;cursor:pointer;margin-left:auto;}
+#apiSetup{width:100%;max-width:320px;background:rgba(255,215,0,0.05);border:1px solid rgba(255,215,0,0.18);border-radius:8px;padding:10px 12px;margin-bottom:6px;display:none;}
+#apiSetup.show{display:block;}
+#apiSetup p{font-size:10px;color:#FFD700;letter-spacing:1px;margin-bottom:6px;text-transform:uppercase;}
+#apiSetup input{width:100%;background:rgba(0,0,0,0.5);border:1px solid rgba(255,215,0,0.2);color:#fff;font-family:'Oswald',sans-serif;font-size:11px;padding:6px 8px;border-radius:4px;margin-bottom:6px;}
+#apiSetup input::placeholder{color:#333;}
+.setup-btn{background:rgba(255,215,0,0.15);border:1px solid #FFD700;color:#FFD700;font-family:'Oswald',sans-serif;font-size:11px;padding:5px 10px;border-radius:4px;cursor:pointer;text-transform:uppercase;margin-right:4px;}
+.setup-btn.sec{background:transparent;border-color:rgba(255,255,255,0.1);color:#555;}
+
+.stats-row{display:flex;gap:6px;margin-bottom:6px;width:100%;max-width:320px;}
+.stat-box{background:rgba(255,255,255,0.03);border:1px solid rgba(117,178,221,0.12);border-radius:6px;padding:5px 8px;text-align:center;flex:1;}
+.stat-label{font-size:8px;color:#75b2dd;letter-spacing:1px;text-transform:uppercase;}
+.stat-value{font-family:'Bebas Neue',cursive;font-size:22px;color:#FFD700;line-height:1;}
+
+.game-row{display:flex;gap:8px;align-items:flex-start;margin-bottom:8px;}
+.cwrap{position:relative;}
+.bgill{position:absolute;top:0;left:0;width:200px;height:380px;z-index:1;border-radius:4px;overflow:hidden;}
+#gameCanvas{position:relative;z-index:2;border:1px solid rgba(117,178,221,0.2);border-radius:3px;image-rendering:pixelated;display:block;}
+#scanlines{position:absolute;top:0;left:0;width:200px;height:380px;z-index:3;pointer-events:none;border-radius:3px;background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,0.06) 3px,rgba(0,0,0,0.06) 4px);}
+#scoreFlash{position:absolute;top:40%;left:50%;transform:translate(-50%,-50%);z-index:20;display:none;pointer-events:none;}
+#scoreFlash.show{display:block;animation:flashPop 0.55s forwards;}
+@keyframes flashPop{0%{transform:translate(-50%,-50%) scale(0.4);opacity:0}40%{transform:translate(-50%,-50%) scale(1.3);opacity:1}70%{transform:translate(-50%,-50%) scale(1);opacity:1}100%{transform:translate(-50%,-50%) scale(1.1);opacity:0}}
+#scoreFlash span{font-family:'Bebas Neue',cursive;font-size:26px;color:#FFD700;text-shadow:0 0 18px rgba(255,215,0,0.8);letter-spacing:3px;}
+
+.side-panel{display:flex;flex-direction:column;gap:7px;width:78px;}
+.pbox{background:rgba(255,255,255,0.03);border:1px solid rgba(117,178,221,0.12);border-radius:7px;padding:7px;text-align:center;}
+.plabel{font-size:8px;color:#75b2dd;letter-spacing:1px;text-transform:uppercase;margin-bottom:3px;}
+#nextCanvas{image-rendering:pixelated;}
+.btn{background:rgba(117,178,221,0.05);border:1px solid rgba(117,178,221,0.2);color:#75b2dd;font-family:'Oswald',sans-serif;font-size:10px;letter-spacing:1px;padding:5px 6px;border-radius:4px;cursor:pointer;text-transform:uppercase;width:100%;}
+.btn:active{background:rgba(117,178,221,0.15);}
+
+.controls{display:flex;flex-direction:column;align-items:center;gap:5px;width:100%;max-width:320px;}
+.ctrl-row{display:flex;gap:5px;justify-content:center;}
+.ctrl-btn{width:68px;height:54px;background:rgba(255,255,255,0.04);border:1px solid rgba(117,178,221,0.18);border-radius:11px;color:#75b2dd;font-size:23px;display:flex;align-items:center;justify-content:center;cursor:pointer;user-select:none;-webkit-user-select:none;touch-action:manipulation;}
+.ctrl-btn:active{background:rgba(117,178,221,0.14);transform:scale(0.94);}
+.ctrl-btn.drop{width:144px;font-size:12px;font-family:'Oswald',sans-serif;letter-spacing:2px;height:44px;color:#FFD700;border-color:rgba(255,215,0,0.22);}
+
+#celebration{display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:100;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;}
+#celebration.show{display:flex;}
+.cbg{position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);animation:fio 3s forwards;}
+.ccon{position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;gap:5px;animation:pin 3s forwards;text-align:center;padding:0 20px;}
+.ctv{font-family:'Bebas Neue',cursive;font-size:10px;color:#CC0000;letter-spacing:3px;background:white;padding:2px 10px;border-radius:2px;margin-bottom:3px;}
+.ctxt{font-family:'Bebas Neue',cursive;color:#FFD700;letter-spacing:5px;text-shadow:0 0 40px rgba(255,215,0,0.9);line-height:1;}
+.csub{font-family:'Oswald',sans-serif;font-size:11px;color:#ddd;max-width:260px;line-height:1.4;font-style:italic;}
+.cemi{font-size:46px;animation:bnc 0.4s infinite alternate;}
+.cfp{position:absolute;border-radius:2px;animation:cfall 2.5s forwards;}
+@keyframes fio{0%{opacity:0}10%{opacity:1}80%{opacity:1}100%{opacity:0}}
+@keyframes pin{0%{transform:scale(0.2);opacity:0}15%{transform:scale(1.1);opacity:1}25%{transform:scale(0.97)}35%{transform:scale(1.03)}45%{transform:scale(1)}85%{transform:scale(1);opacity:1}100%{transform:scale(1.05);opacity:0}}
+@keyframes bnc{from{transform:translateY(0)}to{transform:translateY(-8px)}}
+@keyframes cfall{0%{transform:translateY(-80px) rotate(0deg);opacity:1}100%{transform:translateY(100vh) rotate(720deg);opacity:0}}
+
+#overlay{position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(5,13,26,0.96);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:10;gap:7px;text-align:center;border-radius:3px;padding:14px;}
+#overlay h2{font-family:'Bebas Neue',cursive;font-size:26px;color:#75b2dd;letter-spacing:3px;}
+#overlay h2 span{color:#FFD700;}
+.obtn{background:rgba(204,0,0,0.2);border:1px solid #CC0000;color:#fff;font-family:'Oswald',sans-serif;font-size:13px;letter-spacing:2px;padding:9px 20px;border-radius:5px;cursor:pointer;margin-top:5px;}
+
+.title-bar{text-align:center;margin-bottom:7px;}
+.title-bar h1{font-family:'Bebas Neue',cursive;font-size:30px;color:#75b2dd;letter-spacing:4px;line-height:1;}
+.title-bar h1 span{color:#FFD700;}
+.title-bar p{font-size:9px;color:#444;letter-spacing:2px;}
+</style>
+</head>
+<body>
+
+<div id="celebration">
+  <div class="cbg"></div>
+  <div class="ccon" id="ccon">
+    <div class="ctv">📺 RADIO PIBE FM — EN VIVO</div>
+    <div class="cemi" id="cemi">⚽</div>
+    <div class="ctxt" id="ctxt">GOOOL</div>
+    <div class="csub" id="csub"></div>
+  </div>
+</div>
+
+<div class="title-bar">
+  <h1>EL PIBE <span>TRIS</span></h1>
+  <p>🇦🇷 Estadio del Pixel — Transmisión en vivo 🇦🇷</p>
+</div>
+
+<div id="broadcastBar">
+  <div class="live-badge">● EN VIVO</div>
+  <div id="channelName">📻 Radio Pibe FM</div>
+  <div id="clockDisplay">00:00</div>
+</div>
+<div id="waveWrap">
+  <div class="mic-icon">🎙️</div>
+  <canvas id="waveCanvas"></canvas>
+  <div id="speakerName">El Relator</div>
+</div>
+<div id="commentBox">
+  <div id="commentText" class="muted">Preparando la transmisión...</div>
+</div>
+
+<div id="ticker"><div id="tickerTrack">⚽ EL PIBE TRIS — TRANSMISIÓN EN VIVO &nbsp;&nbsp;&nbsp; 🏆 ESTADIO DEL PIXEL &nbsp;&nbsp;&nbsp; 🇦🇷 DALE ARGENTINA &nbsp;&nbsp;&nbsp; ⚽ EL PIBE TRIS &nbsp;&nbsp;&nbsp;</div></div>
+
+<div id="apiSetup">
+  <p>🎙️ Activar voz (ElevenLabs)</p>
+  <input type="password" id="elKey" placeholder="API key de ElevenLabs..."/>
+  <div>
+    <button class="setup-btn" onclick="saveKey()">Activar voz</button>
+    <button class="setup-btn sec" onclick="hideSetup()">Cerrar</button>
+  </div>
+</div>
+<div id="voiceRow">
+  <div class="vdot" id="vdot"></div>
+  <span class="vlabel" id="vlabel">Solo texto</span>
+  <span class="vlink" onclick="toggleSetup()">+ Voz ElevenLabs</span>
+</div>
+
+<div class="stats-row">
+  <div class="stat-box"><div class="stat-label">Puntos</div><div class="stat-value" id="scoreVal">0</div></div>
+  <div class="stat-box"><div class="stat-label">Nivel</div><div class="stat-value" id="levelVal">1</div></div>
+  <div class="stat-box"><div class="stat-label">Líneas</div><div class="stat-value" id="linesVal">0</div></div>
+</div>
+
+<div class="game-row">
+  <div class="cwrap">
+    <div class="bgill" id="bgill"></div>
+    <canvas id="gameCanvas" width="200" height="380"></canvas>
+    <div id="scanlines"></div>
+    <div id="scoreFlash"><span id="scoreFlashTxt">+100</span></div>
+    <div id="overlay">
+      <div class="live-badge" style="font-size:8px;margin-bottom:3px;">● RADIO PIBE FM</div>
+      <h2>EL PIBE <span>TRIS</span></h2>
+      <p style="color:#444;font-size:9px;letter-spacing:1px;margin-top:2px;">🇦🇷 Transmisión en vivo</p>
+      <svg width="52" height="74" viewBox="0 0 52 74" style="margin:4px 0;">
+        <circle cx="26" cy="10" r="9" fill="#c8956c"/><ellipse cx="26" cy="4" rx="9" ry="6" fill="#2c1a0e"/><ellipse cx="19" cy="8" rx="4" ry="3" fill="#2c1a0e"/>
+        <ellipse cx="26" cy="25" rx="11" ry="13" fill="#75b2dd"/>
+        <rect x="17" y="14" width="3" height="21" fill="white" rx="1"/><rect x="22" y="14" width="3" height="21" fill="white" rx="1"/>
+        <rect x="17" y="35" width="17" height="11" fill="#1a3a6e" rx="2"/>
+        <rect x="17" y="45" width="7" height="17" fill="#c8956c" rx="3"/>
+        <rect x="28" y="45" width="7" height="11" fill="#c8956c" rx="3" transform="rotate(-20 31 45)"/>
+        <rect x="5" y="15" width="6" height="13" fill="#75b2dd" rx="3" transform="rotate(-30 8 15)"/>
+        <rect x="40" y="11" width="6" height="13" fill="#75b2dd" rx="3" transform="rotate(-45 43 11)"/>
+        <circle cx="46" cy="40" r="6" fill="white" stroke="#333" stroke-width="1"/>
+        <path d="M42 36 L46 34 L50 36 L48 41 L44 41 Z" fill="#333"/>
+      </svg>
+      <button class="obtn" id="startBtn">¡A jugar, crack!</button>
+    </div>
+  </div>
+  <div class="side-panel">
+    <div class="pbox"><div class="plabel">Siguiente</div><canvas id="nextCanvas" width="72" height="72"></canvas></div>
+    <div class="pbox" style="font-size:8px;color:#444;font-style:italic;line-height:1.4;text-align:left;padding:5px 5px 5px 7px;border-left:2px solid #CC0000;border-radius:0 6px 6px 0;" id="quoteBox">"Dale que va..."</div>
+    <button class="btn" id="pauseBtn">Pausa</button>
+    <button class="btn" id="restartBtn">Reiniciar</button>
+  </div>
+</div>
+
+<div class="controls">
+  <div class="ctrl-row"><div class="ctrl-btn" id="btnRotate">↻</div></div>
+  <div class="ctrl-row">
+    <div class="ctrl-btn" id="btnLeft">◀</div>
+    <div class="ctrl-btn" id="btnDown">▼</div>
+    <div class="ctrl-btn" id="btnRight">▶</div>
+  </div>
+  <div class="ctrl-row"><div class="ctrl-btn drop" id="btnDrop">⬇ SOLTAR</div></div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// LOCAL COMMENTARY BANK — instant, no API needed
+// Rich Argentine football radio commentary, always fresh
+// ═══════════════════════════════════════════════════════════
+const BANK = {
+  inicio: [
+    "¡Arranca el partido, señores! ¡El tablero virgen nos espera como un Monumental vacío antes del clásico!",
+    "¡Buenas noches desde el Estadio del Pixel! ¡El Pibe entra a la cancha con todo! ¡Dale crack!",
+    "¡Transmitiendo en vivo! ¡El primer bloque baja como Riquelme pidiendo la pelota en el mediocampo!",
+    "¡Arrancamos! ¡Tablero limpio, mente limpia! ¡Como el primer día de pretemporada antes de que todo salga mal!",
+    "¡EN VIVO Y EN DIRECTO desde el Estadio del Pixel! ¡El Pibe está listo! ¡El tablero, también!",
+  ],
+  pieza_I: [
+    "¡Viene la recta, la línea de cuatro! ¡El 9 goleador! ¡Todos la esperan! ¡No la desperdicies, crack!",
+    "¡LA RECTA! ¡El palo santo del Tetris! ¡Usala bien o llorarás tres noches seguidas!",
+    "¡Apareció el delantero centro! ¡La I, señores! ¡El goleador que se esconde cuando lo necesitás!",
+    "¡La pieza más codiciada baja del cielo! ¡La recta! ¡Como Batistuta en el área, letal!",
+  ],
+  pieza_O: [
+    "¡El cuadrado gordito! ¡La O! ¡Ese jugador que pone el técnico y no corre ni para agarrar el bondi!",
+    "¡Viene el cuadradito! ¡Útil como un arquero que sólo ataja con los pies! ¡Pero algo hace!",
+    "¡La O, señores! ¡El mediocampista que nunca se equivoca porque nunca hace nada interesante!",
+    "¡El cuadrado perfecto! ¡Como Racing cuando juega bien: simétrico, aburrido, pero funciona!",
+  ],
+  pieza_T: [
+    "¡La T! ¡El mediocampista versátil! ¡Sirve para todo y para nada al mismo tiempo! ¡Típico!",
+    "¡Viene la T! ¡El volante box-to-box del Tetris! ¡Puede ir para cualquier lado, como la economía argentina!",
+    "¡La T, señores! ¡Tres cuadrados arriba, uno abajo! ¡Como la hinchada: muchos y desordenados!",
+  ],
+  pieza_S: [
+    "¡La S MALDITA! ¡Más traicionera que un lateral que tira el centro para atrás! ¡Andá a tu casa!",
+    "¡La S! ¡La pieza que no encaja en ningún lado! ¡Como ese jugador que compró el club por veinte millones y no la ve!",
+    "¡Viene la S, señores! ¡La kriptonita del Tetris! ¡Rezá para que caiga bien o perdiste todo!",
+  ],
+  pieza_Z: [
+    "¡La Z inmunda! ¡La hermana mala de la S! ¡Juntas arruinaron más partidos que un árbitro comprado!",
+    "¡La Z! ¡Qué hdp de pieza, con perdón! ¡Zigzag del mal, azote del tablero, pesadilla del pibe!",
+    "¡Otra vez la Z! ¡Esto es peor que tres offside seguidos con el arco vacío!",
+  ],
+  pieza_L: [
+    "¡La L, el wing derecho! ¡Encare por la banda, pibe, que por el medio está todo cerrado!",
+    "¡La L! ¡El lateral que ataca bien pero defiende como un colador! ¡Oportunidad!",
+    "¡Wing derecho en cancha! ¡La L baja con ganas! ¡Dale que es tuya, crack!",
+  ],
+  pieza_J: [
+    "¡La J, el wing zurdo! ¡El zurdo siempre más creativo, más loco, más impredecible!",
+    "¡La J! ¡Igual que la L pero al revés! ¡Como Boca y River: parecidos pero enemigos mortales!",
+    "¡Wing zurdo a la cancha! ¡La J con toda la magia del zurdo! ¡Gambeteá, pibe!",
+  ],
+  rotar: [
+    "¡La giró! ¡Gambeta en el aire! ¡Eso no se enseña, se trae de cuna!",
+    "¡Taco, vuelta, giro! ¡De taco, señores! ¡Categoría pura!",
+    "¡La rotó como Riquelme girando para dar el pase! ¡Elegancia total!",
+    "¡Spin! ¡El pibe la da vuelta en el aire como Messi esquivando cinco defensores!",
+  ],
+  soltar: [
+    "¡REMATE AL ARCO! ¡La soltó de golpe! ¡Con todo! ¡Sin dudar!",
+    "¡La clavó al piso! ¡Como Batistuta en el mundial! ¡Sin anestesia!",
+    "¡Definición! ¡La mandó abajo sin pensarla! ¡Eso es decisión, crack!",
+    "¡Tiro libre directo! ¡Sin barrera, sin arquero, sin piedad!",
+  ],
+  linea1: [
+    "¡¡GOOOOOOOL!! ¡¡Una línea!! ¡¡El pibe la mandó al fondo de la red!! ¡¡SE BORRÓ LA FILA!!",
+    "¡¡GOL DEL PIBE!! ¡¡Limpio, preciso, de zurda!! ¡¡La fila desapareció como promesa de político!!",
+    "¡¡GOLAZO!! ¡¡Una línea completa!! ¡¡El estadio explota!! ¡¡TOMÁ!!",
+    "¡¡GOOOOL!! ¡¡La fila se fue al carajo!! ¡¡Como la defensa de Independiente en el segundo tiempo!!",
+    "¡¡GOL!! ¡¡El pibe la metió!! ¡¡Fila 14 que desaparece!! ¡¡Se evaporó, no existe más!!",
+  ],
+  linea2: [
+    "¡¡¡DOBLETE!!! ¡¡¡DOS LÍNEAS DE UNA!!! ¡¡¡EL PIBE ESTÁ EN MODO MESSI EN EL MUNDIAL!!!",
+    "¡¡¡DOS DE UNA, LA CONCHA DE SU MADRE!!! ¡¡¡DOBLETE DEL CRACK!!! ¡¡¡DESCOMUNAL!!!",
+    "¡¡¡DOS FILAS JUNTAS!!! ¡¡¡Como ganar un clásico con gol en el último minuto!!! ¡¡¡DOBLETE!!!",
+    "¡¡¡DOS LÍNEAS!!! ¡¡¡El pibe no para!!! ¡¡¡No lo paran ni con dos volantes de contención!!!",
+  ],
+  linea3: [
+    "¡¡¡¡HAT-TRICK!!!! ¡¡¡¡TRES LÍNEAS DE UNA!!!! ¡¡¡¡LA PUTA MADRE QUÉ JUGADOR!!!!",
+    "¡¡¡¡TRIPLETE DEL CRACK!!!! ¡¡¡¡Tres filas al mismo tiempo!!!! ¡¡¡¡ESTO NO SE VE TODOS LOS DÍAS!!!!",
+    "¡¡¡¡TRES DE UNA!!!! ¡¡¡¡El estadio se viene abajo!!!! ¡¡¡¡FENÓMENO TOTAL, LEYENDA!!!!",
+  ],
+  linea4: [
+    "¡¡¡¡¡TETRIS DEL PIBE!!!!! ¡¡¡¡¡CUATRO LÍNEAS!!!! ¡¡¡¡¡GOLAZO HISTÓRICO!!!!! ¡¡¡¡¡SE LO DEDICA A TODA ARGENTINA!!!!!",
+    "¡¡¡¡¡CUATRO DE UNA!!!!! ¡¡¡¡¡LA CONCHA DE SU MADRE!!!!! ¡¡¡¡¡ESTO ES FÚTBOL TOTAL!!!!! ¡¡¡¡¡LEYENDA!!!!",
+    "¡¡¡¡¡TETRIS COMPLETO!!!!! ¡¡¡¡¡Como el gol de Maradona a los ingleses pero al cuadrado!!!!! ¡¡¡¡¡FENÓMENO!!!!",
+  ],
+  peligro: [
+    "¡¡PELIGRO!! ¡El tablero se llena como la Popular en el clásico! ¡No entra ni un alfiler! ¡Gambeteá!",
+    "¡ESTAMOS COMPLICADOS! ¡Las piezas llegan arriba! ¡Esto es penal en el descuento! ¡Aguantá, crack!",
+    "¡OJO, OJO, OJO! ¡Se viene el game over! ¡El pibe transpira más que un arquero en la tanda!",
+    "¡El tablero está más lleno que un asado del primero de mayo! ¡NECESITAMOS LA RECTA YA!",
+    "¡DANGER! ¡Las piezas trepan como globos en una cancha de barrio! ¡Gambeteá o perdemos!",
+  ],
+  subeNivel: [
+    "¡Sube el nivel! ¡Los bloques se aceleran! ¡Esto es para los valientes! ¡El pibe no afloja!",
+    "¡NIVEL NUEVO! ¡La cosa se pone brava! ¡Como el segundo tiempo cuando el técnico saca al 10!",
+    "¡Subimos de nivel, señores! ¡La presión aumenta! ¡Como en los penales del mundial!",
+  ],
+  hueco: [
+    "¡Quedó un hueco! ¡ESO ES PENAL, HERMANO! ¡¿DÓNDE ESTÁ EL VAR?! ¡Ah, no hay VAR en el Tetris!",
+    "¡Dejaste un agujero! ¡Eso se paga caro! ¡Como dejar al 9 libre en el segundo palo!",
+    "¡Hueco en el tablero! ¡El comentarista está furioso! ¡¿Por qué, por qué lo hiciste?!",
+  ],
+  pausa: [
+    "⏸ Partido suspendido... El relator fue al baño y se llevó el mate.",
+    "⏸ Tiempo de hidratación... El Pibe toma agua. O fernet. Probablemente fernet.",
+    "⏸ Pausa técnica. El técnico da instrucciones que nadie va a seguir.",
+  ],
+  finPartido: [
+    "¡GAME OVER! ¡Final del encuentro! ¡Qué partido, señores! ¡Aplausos para el crack! — Auspicia: Fernecito con Coca, para los descensos y los Game Over de la vida.",
+    "¡Se terminó! ¡El pibe lo dejó todo en la cancha! ¡Hasta la próxima, cracks! — Fernecito con Coca: porque después de cada Game Over, necesitás uno.",
+    "¡FIN! ¡Peor que perder un clásico con gol en contra del arquero! ¡Pero el hincha argentino nunca se rinde! — Fernecito con Coca, auspiciante oficial.",
+  ],
+};
+
+function pick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+function getLocal(event, pieceName){
+  const pmap = {I:'pieza_I',O:'pieza_O',T:'pieza_T',S:'pieza_S',Z:'pieza_Z',L:'pieza_L',J:'pieza_J'};
+  if(event==='pieza' && pieceName && pmap[pieceName]) return pick(BANK[pmap[pieceName]]);
+  return pick(BANK[event]||BANK.pieza_T);
+}
+
+// ═══════════════════════════════════════════════════════════
+// COMMENTARY ENGINE — show local INSTANTLY, fetch API async
+// ═══════════════════════════════════════════════════════════
+const SYSTEM=`Sos el relator de "Radio Pibe FM" transmitiendo EN VIVO el Tetris "El Pibe Tris" como partido de fútbol argentino.
+Estilo: Víctor Hugo Morales + humor porteño. Groserías suaves OK. Máximo 30 palabras. Solo el comentario.
+Piezas: I=el 9 goleador, O=el gordito, T=mediocampista, S/Z=piezas traidoras, L/J=los wings.`;
+
+const PROMPTS={
+  inicio:`Arranca el partido. Tablero vacío. Presentación épica estilo clásico Boca-River. 25 palabras máximo.`,
+  pieza:(p,f,l)=>`Baja ${p}. Tablero ${f}% lleno. Nivel ${l}. Narrá su llegada. 20 palabras.`,
+  rotar:(p)=>`El jugador giró ${p}. Gambeta en el aire. 15 palabras.`,
+  soltar:(f)=>`Soltó la pieza de golpe. Tablero ${f}% lleno. Remate al arco. 15 palabras.`,
+  linea1:(s)=>`GOL. 1 línea borrada. Puntos: ${s}. Gritá el gol. 25 palabras.`,
+  linea2:(s)=>`DOBLETE. 2 líneas. Puntos: ${s}. Enloquecé. 25 palabras.`,
+  linea3:(s)=>`HAT-TRICK. 3 líneas. Puntos: ${s}. Perdé la cabeza. 30 palabras.`,
+  linea4:(s)=>`TETRIS. 4 líneas. Puntos: ${s}. El comentario más épico. Mencioná a Maradona y Argentina. 35 palabras.`,
+  peligro:(f)=>`PELIGRO. Tablero ${f}% lleno. Tensión máxima. 20 palabras.`,
+  subeNivel:(l)=>`Subió al nivel ${l}. Dramático. 18 palabras.`,
+  hueco:`Hueco en tablero. Furioso como periodista deportivo. 18 palabras.`,
+  finPartido:(s,l,li)=>`GAME OVER. ${s} puntos. Nivel ${l}. ${li} líneas. Despedida emotiva. Terminá con "Auspicia: Fernecito con Coca". 35 palabras.`,
+};
+
+// API fetch (non-blocking, updates UI when ready IF comment hasn't changed)
+let currentCommentId = 0;
+async function fetchApiComment(event, pieceName, score, level, lines, fill, myId){
+  const promptFn = PROMPTS[event];
+  if(!promptFn) return;
+  const prompt = typeof promptFn==='function' ? promptFn(
+    pieceName||'la pieza', fill, level, score, lines
+  ) : promptFn;
+  try{
+    const res=await fetch("https://api.anthropic.com/v1/messages",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({
+        model:"claude-sonnet-4-20250514",
+        max_tokens:80,
+        system:SYSTEM,
+        messages:[{role:"user",content:prompt}]
+      })
+    });
+    const data=await res.json();
+    const t=data.content?.[0]?.text?.trim();
+    // Only update if this is still the current comment slot AND it's a meaningful upgrade
+    if(t && t.length>10 && myId===currentCommentId){
+      deliverComment(t, true); // silent update — replace text smoothly
+    }
+  }catch(e){}
+}
+
+// ═══════════════════════════════════════════════════════════
+// DISPLAY
+// ═══════════════════════════════════════════════════════════
+let typingTimer=null, waveActive=false;
+
+function deliverComment(text, silent=false){
+  currentCommentId++;
+  const myId=currentCommentId;
+  const el=document.getElementById('commentText');
+  el.className='';
+  // Update quote box
+  const q=text.replace(/[¡!¿?]/g,'').trim().split(/[.,]/)[0].slice(0,48);
+  document.getElementById('quoteBox').textContent='"'+q+'..."';
+  // Update ticker
+  document.getElementById('tickerTrack').textContent='⚽ '+text.replace(/[¡!¿?]/g,'').slice(0,70).toUpperCase()+' ⚽ EL PIBE TRIS — EN VIVO 🇦🇷 ESTADIO DEL PIXEL ';
+
+  if(silent){
+    // Smooth replace without full retype
+    el.textContent=text;
+    setWave(true);
+    setTimeout(()=>setWave(false),1200);
+    return;
+  }
+
+  setWave(true);
+  if(typingTimer)clearTimeout(typingTimer);
+  let i=0, displayed='';
+  el.innerHTML='<span class="cursor"></span>';
+  function tick(){
+    if(i<text.length){
+      displayed+=text[i++];
+      el.innerHTML=displayed+'<span class="cursor"></span>';
+      const ch=text[i-1];
+      const delay=ch==='!'||ch==='¡'?4:i<12?20:i<40?13:9;
+      typingTimer=setTimeout(tick,delay);
+    } else {
+      el.textContent=text;
+      setWave(false);
+      if(voiceOn&&elKey) speak(text);
+    }
+  }
+  tick();
+  return myId;
+}
+
+// Main comment trigger: show local INSTANTLY then fetch API in background
+let lastCommentTime=0;
+const MIN_GAP=3000;
+
+function comment(event, opts={}){
+  const now=Date.now();
+  const isCritical=['linea1','linea2','linea3','linea4','finPartido','inicio'].includes(event);
+  if(!isCritical && now-lastCommentTime<MIN_GAP) return;
+  lastCommentTime=now;
+
+  // 1. Show local immediately
+  const localText=getLocal(event, opts.pieceName);
+  const myId=deliverComment(localText);
+
+  // 2. Fetch API in background — will silently update if still relevant
+  fetchApiComment(event, opts.pieceName, score||0, level||1, lines||0, getBoardFill(), myId);
+}
+
+// ═══════════════════════════════════════════════════════════
+// ELEVENLABS
+// ═══════════════════════════════════════════════════════════
+const EL_VOICE="D09EpJbk4um1HKSpeTSc", EL_MODEL="eleven_multilingual_v2";
+let elKey=localStorage.getItem('pibetris_el')||'';
+let voiceOn=!!elKey, audioQ=[], audioPlaying=false;
+function updateVoiceUI(){
+  const d=document.getElementById('vdot'),l=document.getElementById('vlabel');
+  if(voiceOn&&elKey){d.className='vdot on';l.className='vlabel on';l.textContent='Voz activada ✓';}
+  else{d.className='vdot';l.className='vlabel';l.textContent='Solo texto';}
+}
+function toggleSetup(){document.getElementById('apiSetup').classList.toggle('show');}
+function hideSetup(){document.getElementById('apiSetup').classList.remove('show');}
+function saveKey(){
+  const k=document.getElementById('elKey').value.trim();
+  if(!k){alert('Ingresá tu API key');return;}
+  elKey=k;localStorage.setItem('pibetris_el',k);voiceOn=true;updateVoiceUI();hideSetup();
+  deliverComment('¡Voz argentina activada! ¡Ahora el relator habla de verdad, crack!');
+}
+async function speak(text){
+  if(!voiceOn||!elKey)return;
+  const clean=text.replace(/[¡¿]/g,'').replace(/!{3,}/g,'!!').slice(0,280);
+  try{
+    const res=await fetch('https://api.elevenlabs.io/v1/text-to-speech/'+EL_VOICE,{
+      method:'POST',headers:{'Accept':'audio/mpeg','Content-Type':'application/json','xi-api-key':elKey},
+      body:JSON.stringify({text:clean,model_id:EL_MODEL,voice_settings:{stability:0.25,similarity_boost:0.75,style:0.85,use_speaker_boost:true}})
+    });
+    if(!res.ok)return;
+    const blob=await res.blob(),url=URL.createObjectURL(blob),a=new Audio(url);
+    a.onplay=()=>setWave(true);
+    a.onended=()=>{URL.revokeObjectURL(url);setWave(false);nextAudio();};
+    a.onerror=()=>{URL.revokeObjectURL(url);setWave(false);nextAudio();};
+    audioQ.push(a);if(!audioPlaying)nextAudio();
+  }catch(e){}
+}
+function nextAudio(){if(!audioQ.length){audioPlaying=false;return;}audioPlaying=true;audioQ.shift().play().catch(()=>nextAudio());}
+function stopAudio(){audioQ=[];audioPlaying=false;setWave(false);}
+
+// ═══════════════════════════════════════════════════════════
+// WAVEFORM
+// ═══════════════════════════════════════════════════════════
+const waveCanvas=document.getElementById('waveCanvas');
+const wctx=waveCanvas.getContext('2d');
+let waveBars=[];
+function initWave(){
+  waveCanvas.width=waveCanvas.parentElement.clientWidth-62;
+  waveCanvas.height=18;
+  waveBars=Array.from({length:Math.floor(waveCanvas.width/4)},()=>0);
+}
+function setWave(active){waveActive=active;}
+function animWave(){
+  wctx.clearRect(0,0,waveCanvas.width,waveCanvas.height);
+  const mid=waveCanvas.height/2;
+  for(let i=0;i<waveBars.length;i++){
+    waveBars[i]=waveActive?waveBars[i]*0.82+(Math.random()*13+1)*0.18:waveBars[i]*0.88+0.4*0.12;
+    const h=waveBars[i];
+    wctx.fillStyle=waveActive?'rgba(204,0,0,0.75)':'rgba(80,80,80,0.35)';
+    wctx.fillRect(i*4,mid-h/2,3,h);
+  }
+  requestAnimationFrame(animWave);
+}
+
+// ═══════════════════════════════════════════════════════════
+// CLOCK
+// ═══════════════════════════════════════════════════════════
+let secs=0, clockInt=null;
+function startClock(){secs=0;if(clockInt)clearInterval(clockInt);clockInt=setInterval(()=>{secs++;const m=String(Math.floor(secs/60)).padStart(2,'0'),s=String(secs%60).padStart(2,'0');document.getElementById('clockDisplay').textContent=m+':'+s;},1000);}
+function stopClock(){if(clockInt)clearInterval(clockInt);}
+
+// ═══════════════════════════════════════════════════════════
+// SCORE FLASH
+// ═══════════════════════════════════════════════════════════
+function flashScore(pts){
+  const el=document.getElementById('scoreFlash'),t=document.getElementById('scoreFlashTxt');
+  t.textContent='+'+pts;el.className='show';setTimeout(()=>el.className='',600);
+}
+
+// ═══════════════════════════════════════════════════════════
+// TETRIS ENGINE
+// ═══════════════════════════════════════════════════════════
+const COLS=10,ROWS=19,BLOCK=20;
+const COLORS=[null,'#75b2dd','#FFD700','#E74C3C','#2ECC71','#9B59B6','#E67E22','#1ABC9C'];
+const SHAPES={I:[[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]],O:[[2,2],[2,2]],T:[[0,3,0],[3,3,3],[0,0,0]],S:[[0,4,4],[4,4,0],[0,0,0]],Z:[[5,5,0],[0,5,5],[0,0,0]],J:[[6,0,0],[6,6,6],[0,0,0]],L:[[0,0,7],[7,7,7],[0,0,0]]};
+
+const cv=document.getElementById('gameCanvas'),ctx2=cv.getContext('2d');
+const ncv=document.getElementById('nextCanvas'),nctx=ncv.getContext('2d');
+let board,piece,nextPiece,score,level,lines,gloop,paused,started,gameover,celT;
+let pieceCount=0,rotCount=0,holeCount=0,dangerW=false;
+
+function getBoardFill(){let f=0;for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++)if(board[r][c])f++;return Math.round(f/(ROWS*COLS)*100);}
+function getTopRows(){let t=0;for(let r=0;r<6;r++)for(let c=0;c<COLS;c++)if(board[r][c])t++;return t;}
+function countHoles(){let h=0;for(let c=0;c<COLS;c++){let found=false;for(let r=0;r<ROWS;r++){if(board[r][c])found=true;else if(found)h++;}}return h;}
+
+function mkboard(){return Array.from({length:ROWS},()=>Array(COLS).fill(0));}
+function rndpiece(){
+  const keys=Object.keys(SHAPES),key=keys[Math.floor(Math.random()*keys.length)],sh=SHAPES[key];
+  return{shape:sh.map(r=>[...r]),x:Math.floor(COLS/2)-Math.floor(sh[0].length/2),y:0,name:key};
+}
+function blk(c,x,y,ci,s){if(!ci)return;s=s||BLOCK;c.fillStyle=COLORS[ci];c.fillRect(x*s+1,y*s+1,s-2,s-2);c.strokeStyle='rgba(255,255,255,0.13)';c.lineWidth=0.5;c.strokeRect(x*s+1,y*s+1,s-2,s-2);c.fillStyle='rgba(255,255,255,0.12)';c.fillRect(x*s+2,y*s+2,s-4,3);}
+function drawBoard(){ctx2.clearRect(0,0,cv.width,cv.height);ctx2.fillStyle='rgba(8,20,8,0.78)';ctx2.fillRect(0,0,cv.width,cv.height);for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++)if(board[r][c])blk(ctx2,c,r,board[r][c]);}
+function drawPiece(p){p.shape.forEach((row,r)=>row.forEach((v,c)=>{if(v)blk(ctx2,p.x+c,p.y+r,v);}));}
+function drawGhost(){let g={shape:piece.shape,x:piece.x,y:piece.y};while(!col(g.shape,g.x,g.y+1))g.y++;g.shape.forEach((row,r)=>row.forEach((v,c)=>{if(v){ctx2.strokeStyle='rgba(117,178,221,0.12)';ctx2.lineWidth=1;ctx2.strokeRect((g.x+c)*BLOCK+1,(g.y+r)*BLOCK+1,BLOCK-2,BLOCK-2);}}));}
+function drawNext(){nctx.clearRect(0,0,72,72);const s=nextPiece.shape,bs=14,ox=Math.floor((4-s[0].length)/2),oy=Math.floor((4-s.length)/2);s.forEach((row,r)=>row.forEach((v,c)=>{if(v){nctx.fillStyle=COLORS[v];nctx.fillRect((ox+c)*bs+8,(oy+r)*bs+8,bs-2,bs-2);nctx.fillStyle='rgba(255,255,255,0.12)';nctx.fillRect((ox+c)*bs+8,(oy+r)*bs+8,bs-2,3);}}));}
+function col(sh,px,py){for(let r=0;r<sh.length;r++)for(let c=0;c<sh[r].length;c++){if(!sh[r][c])continue;const nx=px+c,ny=py+r;if(nx<0||nx>=COLS||ny>=ROWS)return true;if(ny>=0&&board[ny][nx])return true;}return false;}
+function merge(){piece.shape.forEach((row,r)=>row.forEach((v,c)=>{if(v)board[piece.y+r][piece.x+c]=v;}));}
+function rot(sh){const n=sh.length,m=sh[0].length,r2=Array.from({length:m},()=>Array(n).fill(0));for(let r=0;r<n;r++)for(let c=0;c<m;c++)r2[c][n-1-r]=sh[r][c];return r2;}
+function render(){drawBoard();drawGhost();drawPiece(piece);}
+
+function confetti(n,cols){
+  const el=document.getElementById('celebration');
+  for(let i=0;i<n;i++){const d=document.createElement('div');d.className='cfp';d.style.left=Math.random()*100+'vw';d.style.top='-20px';d.style.background=cols[Math.floor(Math.random()*cols.length)];d.style.width=(5+Math.random()*9)+'px';d.style.height=(5+Math.random()*9)+'px';d.style.animationDuration=(1.4+Math.random()*1.2)+'s';d.style.animationDelay=(Math.random()*0.5)+'s';d.style.borderRadius=Math.random()>.5?'50%':'2px';el.appendChild(d);setTimeout(()=>d.remove(),3000);}
+}
+function celebrate(cleared){
+  if(celT)clearTimeout(celT);
+  document.querySelectorAll('.cfp').forEach(e=>e.remove());
+  const cel=document.getElementById('celebration'),ctxt=document.getElementById('ctxt'),csub=document.getElementById('csub'),cemi=document.getElementById('cemi');
+  const commentEl=document.getElementById('commentText');
+  csub.textContent=commentEl.textContent||'';
+  if(cleared>=4){ctxt.textContent='TETRIS DEL PIBE';ctxt.style.fontSize='28px';cemi.textContent='🏆⚽🏆';confetti(55,['#FFD700','#75b2dd','#fff','#E74C3C','#2ECC71']);}
+  else if(cleared===3){ctxt.textContent='HAT-TRICK';ctxt.style.fontSize='40px';cemi.textContent='⚽⚽⚽';confetti(35,['#FFD700','#75b2dd','#fff']);}
+  else if(cleared===2){ctxt.textContent='DOBLETE';ctxt.style.fontSize='44px';cemi.textContent='⚽⚽';confetti(20,['#FFD700','#75b2dd']);}
+  else{ctxt.textContent='GOOOL';ctxt.style.fontSize='52px';cemi.textContent='⚽';confetti(10,['#FFD700']);}
+  const cc=document.getElementById('ccon');cc.style.animation='none';void cc.offsetWidth;cc.style.animation='pin 3s forwards';
+  const bg=cel.querySelector('.cbg');bg.style.animation='none';void bg.offsetWidth;bg.style.animation='fio 3s forwards';
+  cel.classList.add('show');celT=setTimeout(()=>cel.classList.remove('show'),3000);
+}
+
+async function clearLines(){
+  let cleared=0;
+  for(let r=ROWS-1;r>=0;r--){if(board[r].every(v=>v)){board.splice(r,1);board.unshift(Array(COLS).fill(0));cleared++;r++;}}
+  if(cleared){
+    const pts=[0,100,300,500,800];
+    const pl=level;
+    const gained=(pts[cleared]||800)*level;
+    score+=gained;lines+=cleared;level=Math.floor(lines/10)+1;
+    document.getElementById('scoreVal').textContent=score;
+    document.getElementById('levelVal').textContent=level;
+    document.getElementById('linesVal').textContent=lines;
+    flashScore(gained);
+    const ev=['linea1','linea2','linea3','linea4'][Math.min(cleared,4)-1];
+    lastCommentTime=0;
+    comment(ev,{pieceName:piece.name});
+    celebrate(cleared);
+    dangerW=false;
+    if(level>pl) setTimeout(()=>{lastCommentTime=0;comment('subeNivel');},3200);
+    clearInterval(gloop);gloop=setInterval(drop,Math.max(100,800-(level-1)*80));
+  }
+}
+
+function drop(){
+  if(!started||paused||gameover)return;
+  if(!col(piece.shape,piece.x,piece.y+1)){piece.y++;}
+  else{
+    merge();pieceCount++;
+    const holes=countHoles();
+    if(holes>holeCount+2){holeCount=holes;comment('hueco');}else holeCount=holes;
+    const top=getTopRows();
+    if(top>5&&!dangerW){dangerW=true;lastCommentTime=0;comment('peligro');}
+    else if(top<3)dangerW=false;
+    if(pieceCount%6===0&&top<4) comment('pieza',{pieceName:nextPiece.name});
+    clearLines();
+    piece=nextPiece;nextPiece=rndpiece();drawNext();
+    if(col(piece.shape,piece.x,piece.y)){endGame();return;}
+  }
+  render();
+}
+
+function startGame(){
+  board=mkboard();score=0;level=1;lines=0;pieceCount=0;rotCount=0;holeCount=0;dangerW=false;
+  piece=rndpiece();nextPiece=rndpiece();
+  paused=false;gameover=false;started=true;
+  lastCommentTime=0;stopAudio();
+  document.getElementById('scoreVal').textContent=0;
+  document.getElementById('levelVal').textContent=1;
+  document.getElementById('linesVal').textContent=0;
+  document.getElementById('overlay').style.display='none';
+  document.getElementById('pauseBtn').textContent='Pausa';
+  startClock();drawNext();
+  if(gloop)clearInterval(gloop);
+  gloop=setInterval(drop,800);render();
+  comment('inicio');
+}
+
+function endGame(){
+  started=false;gameover=true;clearInterval(gloop);stopClock();lastCommentTime=0;
+  comment('finPartido');
+  setTimeout(()=>{
+    const ov=document.getElementById('overlay');
+    ov.innerHTML=`<div class="live-badge" style="font-size:8px;">FINAL DEL PARTIDO</div>
+      <h2>GAME <span>OVER</span></h2>
+      <p style="font-family:'Bebas Neue',cursive;font-size:22px;color:#FFD700;margin-top:2px;">${score} PUNTOS</p>
+      <p style="color:#75b2dd;font-size:10px;">NIVEL ${level} · ${lines} LÍNEAS</p>
+      <p style="color:#CC0000;font-size:8px;margin-top:4px;letter-spacing:1px;">AUSPICIA: FERNECITO CON COCA</p>
+      <button class="obtn" onclick="startGame()" style="margin-top:6px;">¡Revancha, crack!</button>`;
+    ov.style.display='flex';
+  },500);
+}
+
+function mvL(){if(!started||paused||gameover)return;if(!col(piece.shape,piece.x-1,piece.y)){piece.x--;render();}}
+function mvR(){if(!started||paused||gameover)return;if(!col(piece.shape,piece.x+1,piece.y)){piece.x++;render();}}
+function mvD(){if(!started||paused||gameover)return;drop();}
+function mvRot(){
+  if(!started||paused||gameover)return;
+  const r=rot(piece.shape);
+  if(!col(r,piece.x,piece.y)){piece.shape=r;render();}
+  else if(!col(r,piece.x+1,piece.y)){piece.x++;piece.shape=r;render();}
+  else if(!col(r,piece.x-1,piece.y)){piece.x--;piece.shape=r;render();}
+  rotCount++;if(rotCount%5===0)comment('rotar',{pieceName:piece.name});
+}
+function mvDrop(){
+  if(!started||paused||gameover)return;
+  while(!col(piece.shape,piece.x,piece.y+1))piece.y++;
+  lastCommentTime=0;comment('soltar',{pieceName:piece.name});
+  drop();
+}
+
+function addBtn(id,fn,rep){
+  const el=document.getElementById(id);let iv;
+  el.addEventListener('touchstart',e=>{e.preventDefault();fn();if(rep)iv=setInterval(fn,130);},{passive:false});
+  el.addEventListener('touchend',e=>{e.preventDefault();clearInterval(iv);},{passive:false});
+  el.addEventListener('mousedown',e=>{fn();if(rep)iv=setInterval(fn,130);});
+  el.addEventListener('mouseup',()=>clearInterval(iv));
+}
+addBtn('btnLeft',mvL,true);addBtn('btnRight',mvR,true);addBtn('btnDown',mvD,true);
+addBtn('btnRotate',mvRot,false);addBtn('btnDrop',mvDrop,false);
+
+document.getElementById('startBtn').addEventListener('click',startGame);
+document.getElementById('restartBtn').addEventListener('click',startGame);
+document.getElementById('pauseBtn').addEventListener('click',()=>{
+  if(!started||gameover)return;paused=!paused;
+  document.getElementById('pauseBtn').textContent=paused?'Continuar':'Pausa';
+  if(paused){stopClock();stopAudio();deliverComment(pick(BANK.pausa));}
+  else{startClock();render();}
+});
+document.addEventListener('keydown',e=>{
+  if(!started||paused||gameover)return;
+  if(e.key==='ArrowLeft')mvL();else if(e.key==='ArrowRight')mvR();else if(e.key==='ArrowDown')mvD();else if(e.key==='ArrowUp')mvRot();else if(e.key===' '){e.preventDefault();mvDrop();}
+});
+
+// Background
+(function(){
+  const bg=document.getElementById('bgill');
+  const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+  svg.setAttribute('width','200');svg.setAttribute('height','380');
+  svg.style.cssText='position:absolute;top:0;left:0;width:100%;height:100%;';
+  svg.innerHTML=`<rect width="200" height="380" fill="#0a1e0a"/><rect x="0" y="0" width="200" height="190" fill="#0d2a0d"/><rect x="0" y="190" width="200" height="190" fill="#0a240a"/><line x1="100" y1="0" x2="100" y2="380" stroke="rgba(255,255,255,0.04)" stroke-width="1"/><line x1="0" y1="190" x2="200" y2="190" stroke="rgba(255,255,255,0.04)" stroke-width="1"/><circle cx="100" cy="190" r="48" fill="none" stroke="rgba(255,255,255,0.04)" stroke-width="1"/><rect x="62" y="1" width="76" height="28" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="1"/><rect x="62" y="351" width="76" height="28" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="1"/><text x="100" y="215" text-anchor="middle" font-family="Bebas Neue,cursive" font-size="110" fill="rgba(117,178,221,0.03)">10</text>`;
+  bg.appendChild(svg);
+})();
+
+initWave();animWave();updateVoiceUI();drawBoard();
+</script>
+</body>
+</html>
