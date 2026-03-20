@@ -3,7 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#050d1a">
+<meta name="format-detection" content="telephone=no">
 <title>EL PIBE TRIS — EN VIVO</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-title" content="PibeTris">
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@400;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
@@ -95,6 +102,19 @@ body{background:#050d1a;display:flex;flex-direction:column;align-items:center;mi
 .title-bar h1{font-family:'Bebas Neue',cursive;font-size:30px;color:#75b2dd;letter-spacing:4px;line-height:1;}
 .title-bar h1 span{color:#FFD700;}
 .title-bar p{font-size:9px;color:#444;letter-spacing:2px;}
+
+/* === MOBILE & TOUCH === */
+body{-webkit-text-size-adjust:100%;}
+.game-row,#gameCanvas,.controls{touch-action:none;-webkit-user-select:none;user-select:none;}
+.ctrl-btn,.btn,.obtn,.setup-btn,.vlink{-webkit-tap-highlight-color:transparent;}
+@supports(padding-bottom:env(safe-area-inset-bottom)){body{padding-bottom:calc(14px + env(safe-area-inset-bottom));}}
+@media(max-width:308px){.game-row{transform:scale(0.88);transform-origin:top left;margin-bottom:-46px;}}
+#voiceFreeBtn{font-size:9px;color:#2ECC71;text-decoration:underline;cursor:pointer;margin-left:auto;margin-right:4px;}
+#claudeSetup{width:100%;max-width:320px;background:rgba(117,178,221,0.05);border:1px solid rgba(117,178,221,0.18);border-radius:8px;padding:10px 12px;margin-bottom:6px;display:none;}
+#claudeSetup.show{display:block;}
+#claudeSetup p{font-size:10px;color:#75b2dd;letter-spacing:1px;margin-bottom:6px;text-transform:uppercase;}
+#claudeSetup input{width:100%;background:rgba(0,0,0,0.5);border:1px solid rgba(117,178,221,0.2);color:#fff;font-family:'Oswald',sans-serif;font-size:11px;padding:6px 8px;border-radius:4px;margin-bottom:6px;}
+#claudeSetup input::placeholder{color:#333;}
 </style>
 </head>
 <body>
@@ -138,10 +158,20 @@ body{background:#050d1a;display:flex;flex-direction:column;align-items:center;mi
     <button class="setup-btn sec" onclick="hideSetup()">Cerrar</button>
   </div>
 </div>
+<div id="claudeSetup">
+  <p>🤖 Activar comentarios IA (Claude)</p>
+  <input type="password" id="claudeKeyInput" placeholder="API key de Anthropic..."/>
+  <div>
+    <button class="setup-btn" onclick="saveClaudeKey()">Activar IA</button>
+    <button class="setup-btn sec" onclick="hideClaudeSetup()">Cerrar</button>
+  </div>
+</div>
 <div id="voiceRow">
   <div class="vdot" id="vdot"></div>
   <span class="vlabel" id="vlabel">Solo texto</span>
-  <span class="vlink" onclick="toggleSetup()">+ Voz ElevenLabs</span>
+  <span id="voiceFreeBtn" onclick="toggleFreeVoice()">🔊 Voz</span>
+  <span class="vlink" onclick="toggleSetup()">EL</span>
+  <span class="vlink" style="color:#75b2dd;" onclick="toggleClaudeSetup()">🤖 IA</span>
 </div>
 
 <div class="stats-row">
@@ -339,17 +369,31 @@ const PROMPTS={
 // API fetch (non-blocking, updates UI when ready IF comment hasn't changed)
 let currentCommentId = 0;
 async function fetchApiComment(event, pieceName, score, level, lines, fill, myId){
-  const promptFn = PROMPTS[event];
+  if(!claudeKey) return;
+  const promptFn=PROMPTS[event];
   if(!promptFn) return;
-  const prompt = typeof promptFn==='function' ? promptFn(
-    pieceName||'la pieza', fill, level, score, lines
-  ) : promptFn;
+  let prompt;
+  if(typeof promptFn==='function'){
+    if(event==='pieza') prompt=promptFn(pieceName||'la pieza',fill,level);
+    else if(event==='linea1'||event==='linea2'||event==='linea3'||event==='linea4') prompt=promptFn(score);
+    else if(event==='peligro') prompt=promptFn(fill);
+    else if(event==='subeNivel') prompt=promptFn(level);
+    else if(event==='rotar') prompt=promptFn(pieceName||'la pieza');
+    else if(event==='soltar') prompt=promptFn(fill);
+    else if(event==='finPartido') prompt=promptFn(score,level,lines);
+    else prompt=promptFn(pieceName||'la pieza',fill,level);
+  } else { prompt=promptFn; }
   try{
     const res=await fetch("https://api.anthropic.com/v1/messages",{
       method:"POST",
-      headers:{"Content-Type":"application/json"},
+      headers:{
+        "Content-Type":"application/json",
+        "x-api-key":claudeKey,
+        "anthropic-version":"2023-06-01",
+        "anthropic-dangerous-direct-browser-access":"true"
+      },
       body:JSON.stringify({
-        model:"claude-sonnet-4-20250514",
+        model:"claude-haiku-4-5-20251001",
         max_tokens:80,
         system:SYSTEM,
         messages:[{role:"user",content:prompt}]
@@ -357,9 +401,8 @@ async function fetchApiComment(event, pieceName, score, level, lines, fill, myId
     });
     const data=await res.json();
     const t=data.content?.[0]?.text?.trim();
-    // Only update if this is still the current comment slot AND it's a meaningful upgrade
-    if(t && t.length>10 && myId===currentCommentId){
-      deliverComment(t, true); // silent update — replace text smoothly
+    if(t&&t.length>10&&myId===currentCommentId){
+      deliverComment(t,true);
     }
   }catch(e){}
 }
@@ -368,9 +411,11 @@ async function fetchApiComment(event, pieceName, score, level, lines, fill, myId
 // DISPLAY
 // ═══════════════════════════════════════════════════════════
 let typingTimer=null, waveActive=false;
+let lastCommentText='';
 
 function deliverComment(text, silent=false){
   currentCommentId++;
+  lastCommentText=text;
   const myId=currentCommentId;
   const el=document.getElementById('commentText');
   el.className='';
@@ -388,6 +433,10 @@ function deliverComment(text, silent=false){
     return;
   }
 
+  // 🔊 Start voice IMMEDIATELY — no waiting for typing animation
+  if(voiceOn&&elKey) speak(text);
+  else if(voiceFreeOn) speakFree(text);
+
   setWave(true);
   if(typingTimer)clearTimeout(typingTimer);
   let i=0, displayed='';
@@ -402,7 +451,6 @@ function deliverComment(text, silent=false){
     } else {
       el.textContent=text;
       setWave(false);
-      if(voiceOn&&elKey) speak(text);
     }
   }
   tick();
@@ -432,11 +480,14 @@ function comment(event, opts={}){
 // ═══════════════════════════════════════════════════════════
 const EL_VOICE="D09EpJbk4um1HKSpeTSc", EL_MODEL="eleven_multilingual_v2";
 let elKey=localStorage.getItem('pibetris_el')||'';
+let claudeKey=localStorage.getItem('pibetris_claude')||'';
 let voiceOn=!!elKey, audioQ=[], audioPlaying=false;
 function updateVoiceUI(){
   const d=document.getElementById('vdot'),l=document.getElementById('vlabel');
-  if(voiceOn&&elKey){d.className='vdot on';l.className='vlabel on';l.textContent='Voz activada ✓';}
-  else{d.className='vdot';l.className='vlabel';l.textContent='Solo texto';}
+  const fb=document.getElementById('voiceFreeBtn');
+  if(voiceOn&&elKey){d.className='vdot on';l.className='vlabel on';l.textContent='ElevenLabs ✓';if(fb)fb.textContent='🔊 Voz';}
+  else if(voiceFreeOn){d.className='vdot on';l.className='vlabel on';l.textContent='Voz activa ✓';if(fb)fb.textContent='🔇 Silenciar';}
+  else{d.className='vdot';l.className='vlabel';l.textContent='Solo texto';if(fb)fb.textContent='🔊 Voz';}
 }
 function toggleSetup(){document.getElementById('apiSetup').classList.toggle('show');}
 function hideSetup(){document.getElementById('apiSetup').classList.remove('show');}
@@ -448,6 +499,7 @@ function saveKey(){
 }
 async function speak(text){
   if(!voiceOn||!elKey)return;
+  if(audioQ.length>1)return; // don't pile up
   const clean=text.replace(/[¡¿]/g,'').replace(/!{3,}/g,'!!').slice(0,280);
   try{
     const res=await fetch('https://api.elevenlabs.io/v1/text-to-speech/'+EL_VOICE,{
@@ -462,8 +514,103 @@ async function speak(text){
     audioQ.push(a);if(!audioPlaying)nextAudio();
   }catch(e){}
 }
-function nextAudio(){if(!audioQ.length){audioPlaying=false;return;}audioPlaying=true;audioQ.shift().play().catch(()=>nextAudio());}
-function stopAudio(){audioQ=[];audioPlaying=false;setWave(false);}
+let currentAudio=null;
+function nextAudio(){
+  if(!audioQ.length){audioPlaying=false;currentAudio=null;return;}
+  audioPlaying=true;
+  currentAudio=audioQ.shift();
+  currentAudio.play().catch(()=>{currentAudio=null;nextAudio();});
+}
+function stopAudio(){
+  if(currentAudio){try{currentAudio.pause();currentAudio.currentTime=0;}catch(e){}}
+  currentAudio=null;audioQ=[];audioPlaying=false;setWave(false);
+  if(window.speechSynthesis)window.speechSynthesis.cancel();
+}
+
+// === WEB SPEECH API (free voice) ===
+let voiceFreeOn=localStorage.getItem('pibetris_freevoice')==='1';
+let speechVoice=null;
+function initSpeech(){
+  if(!window.speechSynthesis)return;
+  const findVoice=()=>{
+    const vs=window.speechSynthesis.getVoices();
+    if(!vs.length)return; // not ready yet
+    speechVoice=vs.find(v=>v.lang==='es-AR')
+      ||vs.find(v=>v.lang==='es-419')
+      ||vs.find(v=>v.lang==='es-US')
+      ||vs.find(v=>v.lang==='es-MX')
+      ||vs.find(v=>v.lang==='es-ES')
+      ||vs.find(v=>v.lang.startsWith('es'))
+      ||null;
+  };
+  findVoice();
+  window.speechSynthesis.onvoiceschanged=findVoice;
+  setTimeout(findVoice,200); // Chrome sometimes needs a small delay
+  // Fix Chrome bug: synthesis pauses silently after inactivity
+  setInterval(()=>{
+    if(window.speechSynthesis.paused) window.speechSynthesis.resume();
+  },5000);
+}
+function toggleFreeVoice(){
+  voiceFreeOn=!voiceFreeOn;
+  localStorage.setItem('pibetris_freevoice',voiceFreeOn?'1':'0');
+  updateVoiceUI();
+  if(voiceFreeOn)speakFree('¡Voz activada! ¡Dale crack!');
+}
+function speakFree(text){
+  if(!voiceFreeOn||!window.speechSynthesis)return;
+  const clean=text.replace(/[¡¿]/g,'').replace(/!{3,}/g,'!!').slice(0,250);
+  // Re-detect voice every time (Chrome loads voices lazily)
+  if(!speechVoice){
+    const vs=window.speechSynthesis.getVoices();
+    speechVoice=vs.find(v=>v.lang==='es-US')
+      ||vs.find(v=>v.lang==='es-ES')
+      ||vs.find(v=>v.lang.startsWith('es'))
+      ||null;
+  }
+  const doSpeak=()=>{
+    if(!voiceFreeOn)return;
+    const u=new SpeechSynthesisUtterance(clean);
+    u.lang='es-AR';u.rate=1.35;u.pitch=1.15;
+    if(speechVoice)u.voice=speechVoice;
+    u.onstart=()=>setWave(true);
+    u.onend=()=>setWave(false);
+    u.onerror=()=>setWave(false);
+    window.speechSynthesis.speak(u);
+  };
+  // Only cancel+wait if something is already playing — avoids breaking user gesture chain
+  if(window.speechSynthesis.speaking||window.speechSynthesis.pending){
+    window.speechSynthesis.cancel();
+    setTimeout(doSpeak,50);
+  } else {
+    doSpeak();
+  }
+}
+// Chrome: clear speech queue when tab loses focus (avoids pileup on return)
+document.addEventListener('visibilitychange',()=>{
+  if(document.hidden && window.speechSynthesis) window.speechSynthesis.cancel();
+});
+// === CLAUDE KEY ===
+function toggleClaudeSetup(){document.getElementById('claudeSetup').classList.toggle('show');}
+function hideClaudeSetup(){document.getElementById('claudeSetup').classList.remove('show');}
+function saveClaudeKey(){
+  const k=document.getElementById('claudeKeyInput').value.trim();
+  if(!k){alert('Ingresá tu API key de Anthropic');return;}
+  claudeKey=k;localStorage.setItem('pibetris_claude',k);
+  hideClaudeSetup();
+  deliverComment('¡IA activada! ¡El relator tiene inteligencia artificial, crack!');
+}
+// === AUDIO UNLOCK (iOS) ===
+let audioUnlocked=false;
+function unlockAudio(){
+  if(audioUnlocked)return;audioUnlocked=true;
+  try{const ctx=new(window.AudioContext||window.webkitAudioContext)();ctx.resume();
+    const buf=ctx.createBuffer(1,1,22050),src=ctx.createBufferSource();
+    src.buffer=buf;src.connect(ctx.destination);src.start(0);
+  }catch(e){}
+}
+document.addEventListener('touchstart',unlockAudio,{once:true,passive:true});
+document.addEventListener('click',unlockAudio,{once:true,passive:true});
 
 // ═══════════════════════════════════════════════════════════
 // WAVEFORM
@@ -488,6 +635,8 @@ function animWave(){
   }
   requestAnimationFrame(animWave);
 }
+window.addEventListener('resize',()=>{initWave();});
+window.addEventListener('orientationchange',()=>{setTimeout(initWave,200);});
 
 // ═══════════════════════════════════════════════════════════
 // CLOCK
@@ -543,8 +692,7 @@ function celebrate(cleared){
   if(celT)clearTimeout(celT);
   document.querySelectorAll('.cfp').forEach(e=>e.remove());
   const cel=document.getElementById('celebration'),ctxt=document.getElementById('ctxt'),csub=document.getElementById('csub'),cemi=document.getElementById('cemi');
-  const commentEl=document.getElementById('commentText');
-  csub.textContent=commentEl.textContent||'';
+  csub.textContent=lastCommentText||'';
   if(cleared>=4){ctxt.textContent='TETRIS DEL PIBE';ctxt.style.fontSize='28px';cemi.textContent='🏆⚽🏆';confetti(55,['#FFD700','#75b2dd','#fff','#E74C3C','#2ECC71']);}
   else if(cleared===3){ctxt.textContent='HAT-TRICK';ctxt.style.fontSize='40px';cemi.textContent='⚽⚽⚽';confetti(35,['#FFD700','#75b2dd','#fff']);}
   else if(cleared===2){ctxt.textContent='DOBLETE';ctxt.style.fontSize='44px';cemi.textContent='⚽⚽';confetti(20,['#FFD700','#75b2dd']);}
@@ -566,6 +714,7 @@ async function clearLines(){
     document.getElementById('levelVal').textContent=level;
     document.getElementById('linesVal').textContent=lines;
     flashScore(gained);
+    if(navigator.vibrate)navigator.vibrate(cleared>=4?[50,30,50,30,50]:cleared>=2?[30,20,30]:[20]);
     const ev=['linea1','linea2','linea3','linea4'][Math.min(cleared,4)-1];
     lastCommentTime=0;
     comment(ev,{pieceName:piece.name});
@@ -586,10 +735,10 @@ function drop(){
     const top=getTopRows();
     if(top>5&&!dangerW){dangerW=true;lastCommentTime=0;comment('peligro');}
     else if(top<3)dangerW=false;
-    if(pieceCount%6===0&&top<4) comment('pieza',{pieceName:nextPiece.name});
     clearLines();
     piece=nextPiece;nextPiece=rndpiece();drawNext();
     if(col(piece.shape,piece.x,piece.y)){endGame();return;}
+    if(pieceCount%2===0&&top<4) comment('pieza',{pieceName:piece.name});
   }
   render();
 }
@@ -625,19 +774,20 @@ function endGame(){
   },500);
 }
 
-function mvL(){if(!started||paused||gameover)return;if(!col(piece.shape,piece.x-1,piece.y)){piece.x--;render();}}
-function mvR(){if(!started||paused||gameover)return;if(!col(piece.shape,piece.x+1,piece.y)){piece.x++;render();}}
+function mvL(){if(!started||paused||gameover)return;if(!col(piece.shape,piece.x-1,piece.y)){if(navigator.vibrate)navigator.vibrate(5);piece.x--;render();}}
+function mvR(){if(!started||paused||gameover)return;if(!col(piece.shape,piece.x+1,piece.y)){if(navigator.vibrate)navigator.vibrate(5);piece.x++;render();}}
 function mvD(){if(!started||paused||gameover)return;drop();}
 function mvRot(){
   if(!started||paused||gameover)return;
   const r=rot(piece.shape);
-  if(!col(r,piece.x,piece.y)){piece.shape=r;render();}
-  else if(!col(r,piece.x+1,piece.y)){piece.x++;piece.shape=r;render();}
-  else if(!col(r,piece.x-1,piece.y)){piece.x--;piece.shape=r;render();}
+  if(!col(r,piece.x,piece.y)){piece.shape=r;if(navigator.vibrate)navigator.vibrate(15);render();}
+  else if(!col(r,piece.x+1,piece.y)){piece.x++;piece.shape=r;if(navigator.vibrate)navigator.vibrate(15);render();}
+  else if(!col(r,piece.x-1,piece.y)){piece.x--;piece.shape=r;if(navigator.vibrate)navigator.vibrate(15);render();}
   rotCount++;if(rotCount%5===0)comment('rotar',{pieceName:piece.name});
 }
 function mvDrop(){
   if(!started||paused||gameover)return;
+  if(navigator.vibrate)navigator.vibrate([20,10,20]);
   while(!col(piece.shape,piece.x,piece.y+1))piece.y++;
   lastCommentTime=0;comment('soltar',{pieceName:piece.name});
   drop();
@@ -645,10 +795,13 @@ function mvDrop(){
 
 function addBtn(id,fn,rep){
   const el=document.getElementById(id);let iv;
-  el.addEventListener('touchstart',e=>{e.preventDefault();fn();if(rep)iv=setInterval(fn,130);},{passive:false});
-  el.addEventListener('touchend',e=>{e.preventDefault();clearInterval(iv);},{passive:false});
-  el.addEventListener('mousedown',e=>{fn();if(rep)iv=setInterval(fn,130);});
-  el.addEventListener('mouseup',()=>clearInterval(iv));
+  const stop=()=>clearInterval(iv);
+  el.addEventListener('touchstart',e=>{e.preventDefault();fn();if(rep)iv=setInterval(fn,100);},{passive:false});
+  el.addEventListener('touchend',e=>{e.preventDefault();stop();},{passive:false});
+  el.addEventListener('touchcancel',e=>{e.preventDefault();stop();},{passive:false});
+  el.addEventListener('mousedown',e=>{fn();if(rep)iv=setInterval(fn,100);});
+  el.addEventListener('mouseup',stop);
+  el.addEventListener('mouseleave',stop);
 }
 addBtn('btnLeft',mvL,true);addBtn('btnRight',mvR,true);addBtn('btnDown',mvD,true);
 addBtn('btnRotate',mvRot,false);addBtn('btnDrop',mvDrop,false);
@@ -676,7 +829,14 @@ document.addEventListener('keydown',e=>{
   bg.appendChild(svg);
 })();
 
-initWave();animWave();updateVoiceUI();drawBoard();
+initWave();animWave();updateVoiceUI();drawBoard();initSpeech();
+
+// Register Service Worker (PWA)
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('./sw.js').catch(()=>{});
+  });
+}
 </script>
 </body>
 </html>
